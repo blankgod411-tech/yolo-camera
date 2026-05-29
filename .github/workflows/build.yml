@@ -31,28 +31,49 @@ jobs:
             autoconf libtool pkg-config \
             zlib1g-dev libncurses5-dev libncursesw5-dev \
             libtinfo6 cmake libffi-dev libssl-dev \
-            libltdl-dev
+            libltdl-dev wget
           
       - name: Install Buildozer
         run: |
           pip install --upgrade pip
           pip install buildozer cython
           
-      # ===== 新增：预接受 Android SDK 许可证 =====
-      - name: Accept Android SDK licenses
+      - name: Setup Android SDK cmdline-tools
         run: |
-          mkdir -p ~/.buildozer/android/platform/android-sdk/licenses
-          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-license
-          echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.buildozer/android/platform/android-sdk/licenses/android-sdk-preview-license
+          SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
+          mkdir -p $SDK_DIR/cmdline-tools
+          
+          if [ ! -f "$SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ]; then
+            cd /tmp
+            wget -q https://dl.google.com/android/repository/commandlinetools-linux-11076708_latest.zip
+            unzip -q commandlinetools-linux-11076708_latest.zip
+            mkdir -p $SDK_DIR/cmdline-tools/latest
+            mv cmdline-tools/* $SDK_DIR/cmdline-tools/latest/
+            rm -rf cmdline-tools commandlinetools-linux-11076708_latest.zip
+          fi
+          
+          mkdir -p $SDK_DIR/tools/bin
+          ln -sf $SDK_DIR/cmdline-tools/latest/bin/sdkmanager $SDK_DIR/tools/bin/sdkmanager
+          
+          mkdir -p $SDK_DIR/licenses
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" > $SDK_DIR/licenses/android-sdk-license
+          echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> $SDK_DIR/licenses/android-sdk-license
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" > $SDK_DIR/licenses/android-sdk-preview-license
+          
           mkdir -p ~/.android
           touch ~/.android/repositories.cfg
+          
+          export PATH=$SDK_DIR/cmdline-tools/latest/bin:$PATH
+          yes | sdkmanager --licenses || true
+          yes | sdkmanager "platform-tools" "build-tools;33.0.0" "platforms;android-33" || true
           
       - name: Build APK
         run: |
           buildozer -v android debug
         timeout-minutes: 180
-        
+        env:
+          ANDROID_SDK_ROOT: /home/runner/.buildozer/android/platform/android-sdk
+          
       - name: Upload APK
         if: always()
         uses: actions/upload-artifact@v4
