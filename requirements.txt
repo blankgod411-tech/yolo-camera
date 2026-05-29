@@ -1,0 +1,5 @@
+kivy==2.2.1
+opencv-python==4.8.1.78
+cryptography==41.0.7
+pillow
+numpy
